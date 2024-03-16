@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/deviceListFragment2">
+    <fragment
+        android:id="@+id/deviceListFragment2"
+        android:name="com.dissertation.tmwt.DeviceListFragment"
+        android:label="Ten Meter Walk Test"
+        tools:layout="@layout/fragment_device_list" >
+        <action
+            android:id="@+id/action_deviceListFragment2_to_tmntFragment2"
+            app:destination="@id/tmntFragment2" />
+    </fragment>
+    <fragment
+        android:id="@+id/tmntFragment2"
+        android:name="com.dissertation.tmwt.TmntFragment"
+        android:label="fragment_tmwt"
+        tools:layout="@layout/fragment_tmwt" />
+</navigation>

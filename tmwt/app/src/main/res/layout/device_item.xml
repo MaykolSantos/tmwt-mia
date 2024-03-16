@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/device_item_root_view"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/device_name"
+        android:layout_width="313dp"
+        android:layout_height="58dp"
+        android:text="Device Name" />
+
+    <CheckBox
+        android:id="@+id/selectedDevice"
+        android:layout_width="100dp"
+        android:layout_height="33dp"
+        android:layout_weight="1" />
+
+</LinearLayout>

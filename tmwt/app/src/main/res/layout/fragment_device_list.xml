@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/device_list_fragment"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context=".DeviceListFragment">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_weight="1">
+
+        <EditText
+            android:id="@+id/fileId"
+            android:layout_width="393dp"
+            android:layout_height="79dp"
+            android:layout_weight="1"
+            android:ems="10"
+            android:hint="File Id"
+            android:inputType="text"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <FrameLayout
+            android:layout_width="409dp"
+            android:layout_height="458dp"
+            android:layout_weight="1"
+            app:layout_constraintBottom_toTopOf="@+id/startTMWT"
+            app:layout_constraintTop_toBottomOf="@+id/fileId"
+            tools:layout_editor_absoluteX="2dp">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/devices_recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+        </FrameLayout>
+
+        <Button
+            android:id="@+id/startTMWT"
+            android:layout_width="140dp"
+            android:layout_height="0dp"
+            android:layout_marginBottom="64dp"
+            android:layout_weight="1"
+            android:text="Start TMWT"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="0.498"
+            app:layout_constraintStart_toStartOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</LinearLayout>
