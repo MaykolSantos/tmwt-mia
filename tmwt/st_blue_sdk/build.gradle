@@ -1,0 +1,81 @@
+/*
+ * Copyright (c) 2022(-0001) STMicroelectronics.
+ * All rights reserved.
+ * This software is licensed under terms that can be found in the LICENSE file in
+ * the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ */
+
+plugins {
+    id 'com.android.library'
+    id 'kotlin-android'
+    id 'kotlin-kapt'
+    id 'com.google.dagger.hilt.android' version '2.41' apply false
+    id 'org.jetbrains.kotlin.plugin.serialization' version "2.0.0-Beta5"
+    id 'com.google.devtools.ksp' version '1.9.10-1.0.13'
+}
+
+apply from: file('publish.gradle')
+
+android {
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 26
+        targetSdk 34
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles "consumer-rules.pro"
+    }
+
+    buildTypes {
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+        arg("room.generateKotlin","true")
+    }
+
+    namespace 'com.st.blue_sdk'
+}
+
+kapt {
+    correctErrorTypes true
+}
+
+dependencies {
+    implementation project(path: ':st_opus')
+
+    // Core
+    implementation "androidx.core:core-ktx:*"
+    implementation "com.google.android.material:material:*"
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:*"
+    implementation "androidx.appcompat:appcompat:*"
+
+    // Hilt
+    implementation "com.google.dagger:hilt-android:*"
+    kapt "com.google.dagger:hilt-compiler:*"
+
+    // Kotlinx serialization
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:*"
+    implementation "com.jakewharton.retrofit:retrofit2-kotlinx-serialization-converter:*"
+
+    // Retrofit
+    implementation "com.squareup.retrofit2:retrofit:*"
+    implementation "com.squareup.okhttp3:logging-interceptor:*"
+
+    // Room
+    implementation "androidx.room:room-runtime:*"
+    ksp "androidx.room:room-compiler:*"
+    annotationProcessor("androidx.room:room-compiler:*")
+    implementation("androidx.room:room-ktx:*")
+
+    // Tests
+    testImplementation "junit:junit:*"
+    androidTestImplementation "androidx.test.ext:junit:*"
+    androidTestImplementation "androidx.test.espresso:espresso-core:*"
+}
