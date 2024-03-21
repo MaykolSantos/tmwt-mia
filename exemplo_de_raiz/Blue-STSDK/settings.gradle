@@ -1,0 +1,12 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = "tmwt_app"
+include ':app'
+include ':st_opus'
+include ':st_blue_sdk'
