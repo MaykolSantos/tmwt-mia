@@ -99,6 +99,7 @@ class GattBridgeFlow : BluetoothGattCallback(), GattBridge {
         when (status) {
             BluetoothGatt.GATT_SUCCESS -> {
                 Log.i(TAG, "Services has been discovered")
+                Log.i(TAG, gatt.services.toString())
                 bleEventsFlow.tryEmit(BleEvent.ServicesDiscovered(true, gatt.services))
             }
             else -> {
@@ -152,7 +153,7 @@ class GattBridgeFlow : BluetoothGattCallback(), GattBridge {
         characteristic?.let {
             Log.d(
                 TAG,
-                "Characteristic with uid ${it.uuid} has changed with data ${it.value.contentToString()}"
+                "Characteristic with uid ${it.uuid} has changed with data ${it.value.contentToString()}, service ${it.service.uuid.toString()}"
             )
             notificationFlow.tryEmit(BleNotification(it, it.value))
         }
