@@ -6,14 +6,12 @@ import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentTransaction;
 
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.Toast;
+import android.widget.EditText;
 
 import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
@@ -54,7 +52,6 @@ public class TmntFragment extends Fragment {
         Bundle args = getArguments();
         if (args != null) {
             // Retrieve the ArrayList from the bundle
-            fileName = args.getString("fileName");
             selectedDevices = args.getParcelableArrayList("selectedDevices");
 
             // Now you can use 'selectedDevices' within your fragment
@@ -66,6 +63,8 @@ public class TmntFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        EditText fileName = view.findViewById(R.id.fileId);
 
         Button startTMWT = view.findViewById(R.id.start);
         Button stopTMWT = view.findViewById(R.id.stop);
@@ -87,7 +86,7 @@ public class TmntFragment extends Fragment {
                 }
 
                 for (BluetoothDevice selectedDevice : selectedDevices) {
-                    BLEConnectionTask task = new BLEConnectionTask(getActivity(), selectedDevice, fileName + "_" + selectedDevice.getName());
+                    BLEConnectionTask task = new BLEConnectionTask(getActivity(), selectedDevice, fileName.getText() + "_" + selectedDevice.getName());
                     executorService.submit(task);
                 }
             }

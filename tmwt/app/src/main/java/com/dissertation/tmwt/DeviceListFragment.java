@@ -62,21 +62,13 @@ public class DeviceListFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         Button startTMWT = view.findViewById(R.id.startTMWT);
-        fileIdInputText = view.findViewById(R.id.fileId);
 
         startTMWT.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 String helperText = "";
-                if (fileIdInputText.getText().length() == 0) {
-                    helperText = "No File Id";
-                }
 
                 if (deviceAdapter.getSelectedDevicesCount() == 0) {
-                    if (!isTextEmpty(helperText)) {
-                        helperText += " and ";
-                    }
-
                     helperText += "No devices selected";
                 }
 
@@ -92,7 +84,6 @@ public class DeviceListFragment extends Fragment {
 
                 Bundle args = new Bundle();
                 args.putParcelableArrayList("selectedDevices", deviceAdapter.getSelectedDevices());
-                args.putString("fileName", fileIdInputText.getText().toString());
 
                 // Set the arguments for the fragment
                 tmntFragment.setArguments(args);

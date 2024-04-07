@@ -121,17 +121,6 @@ public class BLEConnectionTask implements Runnable {
                 }
             }
 
-//            @Override
-//            public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-//                UUID characteristicUUID = characteristic.getUuid();
-//                if (CHARACTERISTIC_UUID.equals(characteristicUUID)) {
-//                    byte[] data = characteristic.getValue();
-//                    Log.d("BLE", "Notification received for " + characteristicUUID + ", data: " + Arrays.toString(data));
-//
-//                    // Optionally, convert the data into a more readable or useful format depending on your application's needs
-//                    // For example, converting byte array to string, integer, etc.
-//                }
-//            }
             @Override
             public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
                 UUID characteristicUUID = characteristic.getUuid();
@@ -206,40 +195,6 @@ public class BLEConnectionTask implements Runnable {
             Log.d("BLE", "Service not found");
         }
     }
-
-//    private void connectToDevice(BluetoothDevice device) {
-//        bluetoothGatt = device.connectGatt(context, false, new BluetoothGattCallback() {
-//
-//            @Override
-//            public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
-//                super.onConnectionStateChange(gatt, status, newState);
-//
-//                if (newState == BluetoothProfile.STATE_CONNECTED) {
-//                    gatt.discoverServices();
-//                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-//
-//                }
-//            }
-//
-//            @Override
-//            public void onServicesDiscovered(BluetoothGatt gatt, int status) {
-//                super.onServicesDiscovered(gatt, status);
-//                System.out.println("GATTTT");
-//                if (status == BluetoothGatt.GATT_SUCCESS) {
-//                    System.out.println("GATTTT22222222222");
-//                    UUID serviceUUID = UUID.fromString("00000000-0001-11e1-9ab4-0002a5d5c51b");
-//                    service = gatt.getService(serviceUUID);
-//                    if (service != null) {
-//                        System.out.println("GATTTT333333333333333");
-//                        var charact = service.getCharacteristic(UUID.fromString("00800000-0001-11e1-ac36-0002a5d5c51b"));
-//                        System.out.println("Characterist value -> " + charact.getValue());
-//                    } else {
-//                        System.out.println("Service not found");
-//                    }
-//                }
-//            }
-//        });
-//    }
 
     public void disconnect() {
         if (bluetoothGatt != null) {
