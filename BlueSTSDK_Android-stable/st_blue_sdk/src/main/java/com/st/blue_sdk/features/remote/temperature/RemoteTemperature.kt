@@ -7,6 +7,7 @@
  */
 package com.st.blue_sdk.features.remote.temperature
 
+import android.util.Log
 import com.st.blue_sdk.features.*
 import com.st.blue_sdk.utils.NumberConversion
 import com.st.blue_sdk.utils.UnwrapTimestamp
@@ -40,6 +41,8 @@ class RemoteTemperature(
         dataOffset: Int
     ): FeatureUpdate<RemoteTemperatureInfo> {
 
+        Log.d("BLEEE", "Data offset: $dataOffset")
+
         require(data.size - dataOffset >= 3) { "There are enough bytes available to read" }
 
         //remove multiple of 2^16 since the node can unwrap the timestamp
@@ -48,6 +51,8 @@ class RemoteTemperature(
         val ts = NumberConversion.BigEndian.bytesToUInt16(data, dataOffset).toLong()
         val remoteTs = UnwrapTimestamp().unwrap(ts)
         val temperature = NumberConversion.LittleEndian.bytesToInt16(data, dataOffset + 2) / 10.0f
+
+        Log.d("BLEEE", "Data offset: $dataOffset")
 
         return FeatureUpdate(
             featureName = name,

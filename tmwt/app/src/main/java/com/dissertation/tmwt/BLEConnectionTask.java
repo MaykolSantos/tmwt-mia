@@ -21,37 +21,70 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
+import com.st.blue_sdk.board_catalog.models.BoardFirmware;
+import com.st.blue_sdk.bt.advertise.BleAdvertiseInfo;
 import com.st.blue_sdk.features.Feature;
 import com.st.blue_sdk.features.FeatureUpdate;
 import com.st.blue_sdk.features.acceleration.Acceleration;
 import com.st.blue_sdk.features.acceleration.AccelerationInfo;
+import com.st.blue_sdk.features.gyroscope.Gyroscope;
+import com.st.blue_sdk.features.gyroscope.GyroscopeInfo;
+import com.st.blue_sdk.features.magnetometer.Magnetometer;
+import com.st.blue_sdk.features.magnetometer.MagnetometerInfo;
+import com.st.blue_sdk.features.temperature.Temperature;
+import com.st.blue_sdk.features.temperature.TemperatureInfo;
+import com.st.blue_sdk.logger.CsvFileLogger;
+import com.st.blue_sdk.models.ConnectionStatus;
+import com.st.blue_sdk.models.Node;
+import com.st.blue_sdk.models.RssiData;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 public class BLEConnectionTask implements Runnable {
     private static final int REQUEST_BLUETOOTH_CONNECT_PERMISSION = 1;
+    private final static UUID SERVICE_UUID = UUID.fromString("00000000-0001-11e1-9ab4-0002a5d5c51b");
     private BluetoothDevice device;
     private Context context;
     private BluetoothGatt bluetoothGatt;
     private BluetoothGattService service;
     private String sensorDataString;
-    private Acceleration accelerationFeature;
-
-    private final static UUID SERVICE_UUID = UUID.fromString("00000000-0001-11e1-9ab4-0002a5d5c51b");
-    private final static UUID CHARACTERISTIC_UUID = UUID.fromString("00800000-0001-11e1-ac36-0002a5d5c51b");
-
-
+    private final static String ACCEL_CHARACTERISTIC_NAME = "Accelerometer";
+    private final static String MAGN_CHARACTERISTIC_NAME = "Magnetometer";
+    private final static String TEMP_CHARACTERISTIC_NAME = "Temperature";
+    private final static String GYRO_CHARACTERISTIC_NAME = "Gyroscope";
+    public CsvFileLogger csvFileLogger;
+    public UUID characteristicUUID;
+    public String characteristicName;
     private String fileName;
 
-    public BLEConnectionTask(Context context, BluetoothDevice device, String fileName) {
+    public BLEConnectionTask(Context context, BluetoothDevice device, String fileName, UUID characteristicUUID, String characteristicName) {
         this.context = context;
         this.device = device;
         this.fileName = fileName;
-        this.accelerationFeature = new Acceleration("Acceleration", Feature.Type.STANDARD, true, 1);
+        this.characteristicUUID = characteristicUUID;
+        this.characteristicName = characteristicName;
+
+        // Construct the full path
+        File logDirectory = new File(context.getExternalFilesDir(null) + File.separator + "10MWT" + File.separator + fileName);
+        if (!logDirectory.exists()) {
+            logDirectory.mkdirs(); // Ensure the directory structure exists
+        }
+
+        Log.d("Path", logDirectory.getAbsolutePath());
+
+        // Initialize CsvFileLogger with the full path
+        this.csvFileLogger = new CsvFileLogger(logDirectory.getAbsolutePath());
+        // Assuming there's a method to enable logging
+        this.csvFileLogger.setEnabled(true);
 
     }
 
@@ -99,16 +132,22 @@ public class BLEConnectionTask implements Runnable {
             }
 
             @Override
+            public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
+                super.onMtuChanged(gatt, mtu, status);
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    Log.d("BLE", "MTU changed to " + mtu);
+                } else {
+                    Log.e("BLE", "MTU change failed with status: " + status);
+                }
+            }
+
+            @Override
             public void onServicesDiscovered(BluetoothGatt gatt, int status) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    for (BluetoothGattService service : gatt.getServices()) {
-                        Log.d("BLE", "Service: " + service.getUuid().toString());
-
-                        for (BluetoothGattCharacteristic characteristic : service.getCharacteristics()) {
-                            Log.d("BLE", "  Characteristic: " + characteristic.getUuid().toString());
-                        }
-                    }
+                    Log.d("BLE", "Services discovered.");
                     subscribeToCharacteristic(gatt);
+                } else {
+                    Log.d("BLE", "Service discovery failed, status: " + status);
                 }
             }
 
@@ -123,48 +162,38 @@ public class BLEConnectionTask implements Runnable {
 
             @Override
             public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic) {
-                UUID characteristicUUID = characteristic.getUuid();
-                if (CHARACTERISTIC_UUID.equals(characteristicUUID)) {
+                UUID currentCharacteristicUUID = characteristic.getUuid();
+                if (characteristicUUID.equals(currentCharacteristicUUID)) {
                     byte[] data = characteristic.getValue();
 
                     // Retrieve the device address or name from the gatt instance
-                    String deviceAddress = gatt.getDevice().getAddress(); // For device name, use getDevice().getName();
-
-                    Log.d("BLE", "Notification received from device: " + deviceAddress + " for " + characteristicUUID + ", data: " + Arrays.toString(data));
+                    String deviceAddress = gatt.getDevice().getAddress();
 
                     // Assume timestamp is now; in real applications, this might come from the device or be more accurately tracked
                     long timestamp = System.currentTimeMillis();
 
-                    // Process the data through the Acceleration feature
-                    FeatureUpdate<AccelerationInfo> update = accelerationFeature.extractData(timestamp, data, 0);
-
-                    // Log the interpreted acceleration values with device address
-                    AccelerationInfo accelerationInfo = update.getData();
-                    Log.d("BLE", "Device: " + deviceAddress + " Acceleration X: " + accelerationInfo.getX().getValue() + " " + accelerationInfo.getX().getUnit());
-                    Log.d("BLE", "Device: " + deviceAddress + " Acceleration Y: " + accelerationInfo.getY().getValue() + " " + accelerationInfo.getY().getUnit());
-                    Log.d("BLE", "Device: " + deviceAddress + " Acceleration Z: " + accelerationInfo.getZ().getValue() + " " + accelerationInfo.getZ().getUnit());
+                    if (characteristicName.equals("Accelerometer")) {
+                        getAccelerationData(data, deviceAddress, timestamp);
+                    } else if (characteristicName.equals("Magnetometer")) {
+                        getMagnetometerData(data, deviceAddress, timestamp);
+                    } else if (characteristicName.equals("Temperature")) {
+                        getTemperatureData(data, deviceAddress, timestamp);
+                    } else if (characteristicName.equals("Gyroscope")) {
+                        getGyroscopeData(data, deviceAddress, timestamp);
+                    } else {
+                        // Optionally handle unknown characteristics or log an error
+                        System.out.println("Unknown characteristic: " + characteristicName);
+                    }
                 }
             }
         });
-    }
-
-    // Helper method to convert byte array to hex string
-    private final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
-    public String bytesToHex(byte[] bytes) {
-        char[] hexChars = new char[bytes.length * 2];
-        for (int j = 0; j < bytes.length; j++) {
-            int v = bytes[j] & 0xFF;
-            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
-            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
-        }
-        return new String(hexChars);
     }
 
     private void subscribeToCharacteristic(BluetoothGatt gatt) {
         BluetoothGattService service = gatt.getService(SERVICE_UUID);
 
         if (service != null) {
-            BluetoothGattCharacteristic characteristic = service.getCharacteristic(CHARACTERISTIC_UUID);
+            BluetoothGattCharacteristic characteristic = service.getCharacteristic(characteristicUUID);
 
             if (characteristic != null) {
                 // Check if the characteristic supports notifications
@@ -181,6 +210,7 @@ public class BLEConnectionTask implements Runnable {
                         if (!success) {
                             Log.d("BLE", "Failed to set descriptor value");
                         }
+                        gatt.requestMtu(158); // Request to change the MTU size
                     } else {
                         Log.d("BLE", "Descriptor for enabling notifications not found");
                     }
@@ -201,19 +231,98 @@ public class BLEConnectionTask implements Runnable {
             bluetoothGatt.disconnect();
             bluetoothGatt.close();
         }
-        ContentValues values = new ContentValues();
-        values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName + ".txt");
-        values.put(MediaStore.MediaColumns.MIME_TYPE, "text/plain");
-        values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOCUMENTS);
+    }
 
-        Uri uri = context.getContentResolver().insert(MediaStore.Files.getContentUri("external"), values);
-        try (OutputStream outputStream = context.getContentResolver().openOutputStream(uri)) {
-            outputStream.write(sensorDataString.getBytes());
-            outputStream.flush();
-        } catch (IOException e) {
-            e.printStackTrace();
+    private void writeToCsv(String data, String sensorType) {
+        File logDirectory = new File(context.getExternalFilesDir(null) + File.separator + "10MWT" + File.separator + fileName);
+        if (!logDirectory.exists()) {
+            boolean isDirectoryCreated = logDirectory.mkdirs();
+            Log.d("BLE", "Directory creation " + (isDirectoryCreated ? "successful" : "failed") + " at " + logDirectory.getAbsolutePath());
+        } else {
+            Log.d("BLE", "Directory already exists.");
         }
 
+        File csvFile = new File(logDirectory, device.getName().toString().trim() + "_" + sensorType + ".csv");
+        if (!csvFile.exists()) {
+            try {
+                boolean isFileCreated = csvFile.createNewFile();
+                Log.d("BLE", "File creation " + (isFileCreated ? "successful" : "failed") + " at " + csvFile.getAbsolutePath());
+            } catch (IOException e) {
+                Log.e("BLE", "Error creating CSV file", e);
+            }
+        } else {
+            Log.d("BLE", "File already exists.");
+        }
 
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(csvFile, true))) {
+            bw.write(data);
+            bw.newLine();
+        } catch (IOException e) {
+            Log.e("BLE", "Error writing to CSV file", e);
+        }
+    }
+
+    private void getGyroscopeData(byte[] rawData, String deviceAddress, long timestamp) {
+        Gyroscope gyroscopeFeature = new Gyroscope(GYRO_CHARACTERISTIC_NAME, Feature.Type.STANDARD, true, 1);
+        FeatureUpdate<GyroscopeInfo> update = gyroscopeFeature.extractData(timestamp, rawData, 2);
+
+        GyroscopeInfo gyroscopeInfo = update.getData();
+        String csvData = String.format(Locale.getDefault(), "%d, %f, %f, %f", timestamp, gyroscopeInfo.getX().getValue(), gyroscopeInfo.getY().getValue(), gyroscopeInfo.getZ().getValue());
+
+        writeToCsv(csvData, characteristicName);
+
+        Log.i("TAG", "Gyroscope data: " + csvData);
+        Log.d("BLE", "Device: " + deviceAddress + " Gyroscope X: " + gyroscopeInfo.getX().getValue() + " " + gyroscopeInfo.getX().getUnit());
+        Log.d("BLE", "Device: " + deviceAddress + " Gyroscope Y: " + gyroscopeInfo.getY().getValue() + " " + gyroscopeInfo.getY().getUnit());
+        Log.d("BLE", "Device: " + deviceAddress + " Gyroscope Z: " + gyroscopeInfo.getZ().getValue() + " " + gyroscopeInfo.getZ().getUnit());
+    }
+
+    private void getTemperatureData(byte[] rawData, String deviceAddress, long timestamp) {
+        Temperature temperatureFeature = new Temperature(TEMP_CHARACTERISTIC_NAME, Feature.Type.STANDARD, true, 1);
+        FeatureUpdate<TemperatureInfo> update = temperatureFeature.extractData(timestamp, rawData, 8);
+
+        TemperatureInfo temperatureInfo = update.getData();
+        String csvData = String.format(Locale.getDefault(), "%d, %f", timestamp, temperatureInfo.getTemperature().getValue());
+
+        writeToCsv(csvData, characteristicName);
+
+        Log.i("TAG", "Temperature data: " + csvData);
+        Log.d("BLE", "Device: " + deviceAddress + " Temperature: " + temperatureInfo.getTemperature().getValue() + " " + temperatureInfo.getTemperature().getUnit());
+    }
+
+    private void getMagnetometerData(byte[] rawData, String deviceAddress, long timestamp) {
+        Magnetometer magnetometerFeature = new Magnetometer(MAGN_CHARACTERISTIC_NAME, Feature.Type.STANDARD, true, 1);
+        FeatureUpdate<MagnetometerInfo> update = magnetometerFeature.extractData(timestamp, rawData, 2);
+
+        MagnetometerInfo magnetometerInfo = update.getData();
+        String csvData = String.format(Locale.getDefault(), "%d, %f, %f, %f", timestamp, magnetometerInfo.getX().getValue(), magnetometerInfo.getY().getValue(), magnetometerInfo.getZ().getValue());
+
+        writeToCsv(csvData, characteristicName);
+
+        Log.i("TAG", "Magnetometer data: " + csvData);
+        Log.d("BLE", "Device: " + deviceAddress + " Magnetometer X: " + magnetometerInfo.getX().getValue() + " " + magnetometerInfo.getX().getUnit());
+        Log.d("BLE", "Device: " + deviceAddress + " Magnetometer Y: " + magnetometerInfo.getY().getValue() + " " + magnetometerInfo.getY().getUnit());
+        Log.d("BLE", "Device: " + deviceAddress + " Magnetometer Z: " + magnetometerInfo.getZ().getValue() + " " + magnetometerInfo.getZ().getUnit());
+    }
+
+    private void getAccelerationData(byte[] rawData, String deviceAddress, long timestamp) {
+        // Process the data through the Acceleration feature
+        Acceleration accelerationFeature = new Acceleration(ACCEL_CHARACTERISTIC_NAME, Feature.Type.STANDARD, true, 1);
+
+        FeatureUpdate<AccelerationInfo> update = accelerationFeature.extractData(timestamp, rawData, 2);
+
+        // Log the interpreted acceleration values with device address
+        AccelerationInfo accelerationInfo = update.getData();
+
+        // Format the acceleration data as a CSV string
+        String csvData = String.format(Locale.getDefault(), "%d, %f, %f, %f", timestamp, accelerationInfo.getX().getValue(), accelerationInfo.getY().getValue(), accelerationInfo.getZ().getValue());
+
+        // Write the CSV data to file
+        writeToCsv(csvData, characteristicName);
+
+        Log.i("TAG", "Characteristic with UUID " + characteristicUUID + " has been updated with data " + Arrays.toString(rawData));
+        Log.d("BLE", "Device: " + deviceAddress + " Acceleration X: " + accelerationInfo.getX().getValue() + " " + accelerationInfo.getX().getUnit());
+        Log.d("BLE", "Device: " + deviceAddress + " Acceleration Y: " + accelerationInfo.getY().getValue() + " " + accelerationInfo.getY().getUnit());
+        Log.d("BLE", "Device: " + deviceAddress + " Acceleration Z: " + accelerationInfo.getZ().getValue() + " " + accelerationInfo.getZ().getUnit());
     }
 }
