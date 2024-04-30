@@ -65,13 +65,15 @@ public class BLEConnectionTask implements Runnable {
     public UUID characteristicUUID;
     public String characteristicName;
     private String fileName;
+    private TaskMonitor taskMonitor;
 
-    public BLEConnectionTask(Context context, BluetoothDevice device, String fileName, UUID characteristicUUID, String characteristicName) {
+    public BLEConnectionTask(Context context, BluetoothDevice device, String fileName, UUID characteristicUUID, String characteristicName, TaskMonitor taskMonitor) {
         this.context = context;
         this.device = device;
         this.fileName = fileName;
         this.characteristicUUID = characteristicUUID;
         this.characteristicName = characteristicName;
+        this.taskMonitor = taskMonitor;
 
         // Construct the full path
         File logDirectory = new File(context.getExternalFilesDir(null) + File.separator + "10MWT" + File.separator + fileName);
@@ -91,28 +93,22 @@ public class BLEConnectionTask implements Runnable {
     @Override
     public void run() {
         try {
+            taskMonitor.incrementTasks();
             connectToDevice(device);
 
             // Example of a task doing periodic work
             while (!Thread.currentThread().isInterrupted()) {
-                // Your repeated task logic here
-
-                // Simulate some ongoing work
                 try {
-                    Thread.sleep(1000); // Pause to simulate work and provide a point to check for interruption
+                    Thread.sleep(100);
                 } catch (InterruptedException e) {
-                    // InterruptedException is thrown when the thread is interrupted during sleep or wait
-                    Log.d("BLE", "Thread was interrupted, stopping task.");
                     Thread.currentThread().interrupt(); // Preserve interrupt status
                     break; // Exit the loop
                 }
-
-                // Additional work or checks can go here
             }
         } catch (Exception e) {
-            Log.e("BLE", "Exception in BLEConnectionTask", e);
-            // Additional exception handling as needed
+            Thread.currentThread().interrupt();
         } finally {
+            taskMonitor.decrementTasks();
             disconnect(); // Ensure resources are cleaned up properly
         }
     }
@@ -123,11 +119,11 @@ public class BLEConnectionTask implements Runnable {
             public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     // Connected to the GATT server on the device
-                    Log.d("BLE", "Connected to GATT server.");
+//                    Log.d("BLE", "Connected to GATT server.");
                     gatt.discoverServices();
                 } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                     // Disconnected from the GATT server
-                    Log.d("BLE", "Disconnected from GATT server.");
+//                    Log.d("BLE", "Disconnected from GATT server.");
                 }
             }
 
@@ -135,28 +131,28 @@ public class BLEConnectionTask implements Runnable {
             public void onMtuChanged(BluetoothGatt gatt, int mtu, int status) {
                 super.onMtuChanged(gatt, mtu, status);
                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    Log.d("BLE", "MTU changed to " + mtu);
+//                    Log.d("BLE", "MTU changed to " + mtu);
                 } else {
-                    Log.e("BLE", "MTU change failed with status: " + status);
+//                    Log.e("BLE", "MTU change failed with status: " + status);
                 }
             }
 
             @Override
             public void onServicesDiscovered(BluetoothGatt gatt, int status) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    Log.d("BLE", "Services discovered.");
+//                    Log.d("BLE", "Services discovered.");
                     subscribeToCharacteristic(gatt);
                 } else {
-                    Log.d("BLE", "Service discovery failed, status: " + status);
+//                    Log.d("BLE", "Service discovery failed, status: " + status);
                 }
             }
 
             @Override
             public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
-                    Log.d("BLE", "Successfully subscribed to notifications for " + descriptor.getCharacteristic().getUuid().toString());
+//                    Log.d("BLE", "Successfully subscribed to notifications for " + descriptor.getCharacteristic().getUuid().toString());
                 } else {
-                    Log.d("BLE", "Failed to subscribe to notifications, status: " + status);
+//                    Log.d("BLE", "Failed to subscribe to notifications, status: " + status);
                 }
             }
 
@@ -208,21 +204,21 @@ public class BLEConnectionTask implements Runnable {
                         descriptor.setValue(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE);
                         boolean success = gatt.writeDescriptor(descriptor);
                         if (!success) {
-                            Log.d("BLE", "Failed to set descriptor value");
+//                            Log.d("BLE", "Failed to set descriptor value");
                         }
                         gatt.requestMtu(158); // Request to change the MTU size
                     } else {
-                        Log.d("BLE", "Descriptor for enabling notifications not found");
+//                        Log.d("BLE", "Descriptor for enabling notifications not found");
                     }
                 } else {
                     // The characteristic does not support notifications
-                    Log.d("BLE", "Characteristic does not support notifications");
+//                    Log.d("BLE", "Characteristic does not support notifications");
                 }
             } else {
-                Log.d("BLE", "Characteristic not found");
+//                Log.d("BLE", "Characteristic not found");
             }
         } else {
-            Log.d("BLE", "Service not found");
+//            Log.d("BLE", "Service not found");
         }
     }
 
@@ -237,28 +233,28 @@ public class BLEConnectionTask implements Runnable {
         File logDirectory = new File(context.getExternalFilesDir(null) + File.separator + "10MWT" + File.separator + fileName);
         if (!logDirectory.exists()) {
             boolean isDirectoryCreated = logDirectory.mkdirs();
-            Log.d("BLE", "Directory creation " + (isDirectoryCreated ? "successful" : "failed") + " at " + logDirectory.getAbsolutePath());
+//            Log.d("BLE", "Directory creation " + (isDirectoryCreated ? "successful" : "failed") + " at " + logDirectory.getAbsolutePath());
         } else {
-            Log.d("BLE", "Directory already exists.");
+//            Log.d("BLE", "Directory already exists.");
         }
 
         File csvFile = new File(logDirectory, device.getName().toString().trim() + "_" + sensorType + ".csv");
         if (!csvFile.exists()) {
             try {
                 boolean isFileCreated = csvFile.createNewFile();
-                Log.d("BLE", "File creation " + (isFileCreated ? "successful" : "failed") + " at " + csvFile.getAbsolutePath());
+//                Log.d("BLE", "File creation " + (isFileCreated ? "successful" : "failed") + " at " + csvFile.getAbsolutePath());
             } catch (IOException e) {
-                Log.e("BLE", "Error creating CSV file", e);
+//                Log.e("BLE", "Error creating CSV file", e);
             }
         } else {
-            Log.d("BLE", "File already exists.");
+//            Log.d("BLE", "File already exists.");
         }
 
         try (BufferedWriter bw = new BufferedWriter(new FileWriter(csvFile, true))) {
             bw.write(data);
             bw.newLine();
         } catch (IOException e) {
-            Log.e("BLE", "Error writing to CSV file", e);
+//            Log.e("BLE", "Error writing to CSV file", e);
         }
     }
 
@@ -271,10 +267,10 @@ public class BLEConnectionTask implements Runnable {
 
         writeToCsv(csvData, characteristicName);
 
-        Log.i("TAG", "Gyroscope data: " + csvData);
-        Log.d("BLE", "Device: " + deviceAddress + " Gyroscope X: " + gyroscopeInfo.getX().getValue() + " " + gyroscopeInfo.getX().getUnit());
-        Log.d("BLE", "Device: " + deviceAddress + " Gyroscope Y: " + gyroscopeInfo.getY().getValue() + " " + gyroscopeInfo.getY().getUnit());
-        Log.d("BLE", "Device: " + deviceAddress + " Gyroscope Z: " + gyroscopeInfo.getZ().getValue() + " " + gyroscopeInfo.getZ().getUnit());
+//        Log.i("TAG", "Gyroscope data: " + csvData);
+//        Log.d("BLE", "Device: " + deviceAddress + " Gyroscope X: " + gyroscopeInfo.getX().getValue() + " " + gyroscopeInfo.getX().getUnit());
+//        Log.d("BLE", "Device: " + deviceAddress + " Gyroscope Y: " + gyroscopeInfo.getY().getValue() + " " + gyroscopeInfo.getY().getUnit());
+//        Log.d("BLE", "Device: " + deviceAddress + " Gyroscope Z: " + gyroscopeInfo.getZ().getValue() + " " + gyroscopeInfo.getZ().getUnit());
     }
 
     private void getTemperatureData(byte[] rawData, String deviceAddress, long timestamp) {
@@ -286,8 +282,8 @@ public class BLEConnectionTask implements Runnable {
 
         writeToCsv(csvData, characteristicName);
 
-        Log.i("TAG", "Temperature data: " + csvData);
-        Log.d("BLE", "Device: " + deviceAddress + " Temperature: " + temperatureInfo.getTemperature().getValue() + " " + temperatureInfo.getTemperature().getUnit());
+//        Log.i("TAG", "Temperature data: " + csvData);
+//        Log.d("BLE", "Device: " + deviceAddress + " Temperature: " + temperatureInfo.getTemperature().getValue() + " " + temperatureInfo.getTemperature().getUnit());
     }
 
     private void getMagnetometerData(byte[] rawData, String deviceAddress, long timestamp) {
@@ -299,10 +295,10 @@ public class BLEConnectionTask implements Runnable {
 
         writeToCsv(csvData, characteristicName);
 
-        Log.i("TAG", "Magnetometer data: " + csvData);
-        Log.d("BLE", "Device: " + deviceAddress + " Magnetometer X: " + magnetometerInfo.getX().getValue() + " " + magnetometerInfo.getX().getUnit());
-        Log.d("BLE", "Device: " + deviceAddress + " Magnetometer Y: " + magnetometerInfo.getY().getValue() + " " + magnetometerInfo.getY().getUnit());
-        Log.d("BLE", "Device: " + deviceAddress + " Magnetometer Z: " + magnetometerInfo.getZ().getValue() + " " + magnetometerInfo.getZ().getUnit());
+//        Log.i("TAG", "Magnetometer data: " + csvData);
+//        Log.d("BLE", "Device: " + deviceAddress + " Magnetometer X: " + magnetometerInfo.getX().getValue() + " " + magnetometerInfo.getX().getUnit());
+//        Log.d("BLE", "Device: " + deviceAddress + " Magnetometer Y: " + magnetometerInfo.getY().getValue() + " " + magnetometerInfo.getY().getUnit());
+//        Log.d("BLE", "Device: " + deviceAddress + " Magnetometer Z: " + magnetometerInfo.getZ().getValue() + " " + magnetometerInfo.getZ().getUnit());
     }
 
     private void getAccelerationData(byte[] rawData, String deviceAddress, long timestamp) {
@@ -320,9 +316,9 @@ public class BLEConnectionTask implements Runnable {
         // Write the CSV data to file
         writeToCsv(csvData, characteristicName);
 
-        Log.i("TAG", "Characteristic with UUID " + characteristicUUID + " has been updated with data " + Arrays.toString(rawData));
-        Log.d("BLE", "Device: " + deviceAddress + " Acceleration X: " + accelerationInfo.getX().getValue() + " " + accelerationInfo.getX().getUnit());
-        Log.d("BLE", "Device: " + deviceAddress + " Acceleration Y: " + accelerationInfo.getY().getValue() + " " + accelerationInfo.getY().getUnit());
-        Log.d("BLE", "Device: " + deviceAddress + " Acceleration Z: " + accelerationInfo.getZ().getValue() + " " + accelerationInfo.getZ().getUnit());
+//        Log.i("TAG", "Characteristic with UUID " + characteristicUUID + " has been updated with data " + Arrays.toString(rawData));
+//        Log.d("BLE", "Device: " + deviceAddress + " Acceleration X: " + accelerationInfo.getX().getValue() + " " + accelerationInfo.getX().getUnit());
+//        Log.d("BLE", "Device: " + deviceAddress + " Acceleration Y: " + accelerationInfo.getY().getValue() + " " + accelerationInfo.getY().getUnit());
+//        Log.d("BLE", "Device: " + deviceAddress + " Acceleration Z: " + accelerationInfo.getZ().getValue() + " " + accelerationInfo.getZ().getUnit());
     }
 }

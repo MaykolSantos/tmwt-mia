@@ -23,12 +23,12 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class TmntFragment extends Fragment {
-
     private ArrayList<BluetoothDevice> selectedDevices;
     private String fileName;
     boolean isRunning = false;
     private ExecutorService executorService;
     private List<Runnable> tasks = new ArrayList<>();
+    private TaskMonitor taskMonitor = new TaskMonitor();
     private final static UUID ACCEL_CHARACTERISTIC_UUID = UUID.fromString("00800000-0001-11e1-ac36-0002a5d5c51b");
     private final static UUID MAGN_CHARACTERISTIC_UUID = UUID.fromString("00200000-0001-11e1-ac36-0002a5d5c51b");
     private final static UUID TEMP_CHARACTERISTIC_UUID = UUID.fromString("00190000-0001-11e1-ac36-0002a5d5c51b");
@@ -39,6 +39,7 @@ public class TmntFragment extends Fragment {
     }
 
     public static TmntFragment newInstance(String param1, String param2) {
+
         TmntFragment fragment = new TmntFragment();
         Bundle args = new Bundle();
 
@@ -89,7 +90,6 @@ public class TmntFragment extends Fragment {
 
                 isRunning = true;
 
-                // Define the UUIDs for the characteristics
                 CharacteristicInfo[] characteristics = {
                         new CharacteristicInfo(TEMP_CHARACTERISTIC_UUID, "Temperature"),
                         new CharacteristicInfo(MAGN_CHARACTERISTIC_UUID, "Magnetometer"),
@@ -109,13 +109,14 @@ public class TmntFragment extends Fragment {
                 tasks.clear(); // Clear previous tasks if any
                 for (CharacteristicInfo characteristic : characteristics) {
                     for (BluetoothDevice selectedDevice : selectedDevices) {
-                        BLEConnectionTask task = new BLEConnectionTask(getActivity(), selectedDevice, fileName.getText().toString(), characteristic.uuid, characteristic.name);
+                        BLEConnectionTask task = new BLEConnectionTask(getActivity(), selectedDevice, fileName.getText().toString(), characteristic.uuid, characteristic.name, taskMonitor);
                         Runnable taskWrapper = () -> {
                             try {
-                                Log.i("BEST TAG", characteristic.name + " " + selectedDevice.getName());
+//                                Log.i("BEST TAG", "Starting: " + threadName);
                                 task.run();
+//                                Log.i("BEST TAG", "Finished: " + threadName);
                             } catch (Exception e) {
-                                Log.e("BLE", "Task interrupted", e);
+//                                Log.e("BLE", "Task interrupted: " + threadName, e);
                             }
                         };
                         tasks.add(taskWrapper);
@@ -123,10 +124,7 @@ public class TmntFragment extends Fragment {
                 }
 
                 // Log the number of active threads after submission
-                int activeCount = ((ThreadPoolExecutor) executorService).getActiveCount();
-                System.out.println("Number of active threads: " + activeCount);
                 System.out.println("Number of tasks submitted: " + tasks.size());
-
 
                 tasks.forEach(executorService::submit);
             }
@@ -135,20 +133,27 @@ public class TmntFragment extends Fragment {
         stopTMWT.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                System.out.println("Actually running tasks - " + taskMonitor.getNumberOfTasks());
+
                 if (!isRunning) {
                     System.out.println("Not running");
                     return;
                 }
 
                 if (executorService != null) {
-                    executorService.shutdownNow(); // Attempt to stop all actively executing tasks
+                    executorService.shutdownNow(); // Interrupt all running tasks
                     try {
                         // Wait a while for existing tasks to terminate
                         if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
-                            Log.e("BLE", "Not all tasks terminated");
+                            Log.e("BLE", "Tasks did not terminate; forcing shutdown");
+                            for (Runnable pendingTask : executorService.shutdownNow()) { // Second call to force
+                                if (pendingTask instanceof BLEConnectionTask) {
+                                    ((BLEConnectionTask) pendingTask).disconnect(); // Ensure disconnection
+                                }
+                            }
                         }
                     } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
+                        Thread.currentThread().interrupt(); // Handle thread interruption
                         Log.e("BLE", "Thread interrupted during shutdown", ie);
                     } finally {
                         isRunning = false; // Update the running status
