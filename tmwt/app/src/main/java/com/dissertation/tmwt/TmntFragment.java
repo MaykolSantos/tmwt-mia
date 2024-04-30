@@ -7,12 +7,17 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ListView;
+import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,6 +28,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class TmntFragment extends Fragment {
+    private TextView runningProcessCount;
+    private TextView startAndStopText;
+    private int expectedThreadCount = 0;
     private ArrayList<BluetoothDevice> selectedDevices;
     private String fileName;
     boolean isRunning = false;
@@ -61,6 +69,11 @@ public class TmntFragment extends Fragment {
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
         Bundle args = getArguments();
+        View view = inflater.inflate(R.layout.fragment_tmwt, container, false);
+
+        runningProcessCount = view.findViewById(R.id.runningProcessCount);
+        startAndStopText = view.findViewById(R.id.startAndStopInfo);
+
         if (args != null) {
             // Retrieve the ArrayList from the bundle
             selectedDevices = args.getParcelableArrayList("selectedDevices");
@@ -68,7 +81,7 @@ public class TmntFragment extends Fragment {
             // Now you can use 'selectedDevices' within your fragment
         }
 
-        return inflater.inflate(R.layout.fragment_tmwt, container, false);
+        return view;
     }
 
     @Override
@@ -80,6 +93,8 @@ public class TmntFragment extends Fragment {
         Button startTMWT = view.findViewById(R.id.start);
         Button stopTMWT = view.findViewById(R.id.stop);
 
+        handler.post(updateTaskCountRunnable);
+
         startTMWT.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -89,6 +104,7 @@ public class TmntFragment extends Fragment {
                 }
 
                 isRunning = true;
+                expectedThreadCount = selectedDevices.size() * 4; // Since you have 4 types of characteristics
 
                 CharacteristicInfo[] characteristics = {
                         new CharacteristicInfo(TEMP_CHARACTERISTIC_UUID, "Temperature"),
@@ -98,35 +114,40 @@ public class TmntFragment extends Fragment {
                 };
 
                 // Calculate the number of tasks to determine the size of the thread pool
-                int numberOfTasks = selectedDevices.size() * characteristics.length;
+                int numberOfTasks = expectedThreadCount;
 
                 // Initialize the ExecutorService with the fixed number of threads
                 if (executorService == null || executorService.isShutdown()) {
                     executorService = Executors.newFixedThreadPool(numberOfTasks);
                 }
 
-                // Collect tasks
                 tasks.clear(); // Clear previous tasks if any
                 for (CharacteristicInfo characteristic : characteristics) {
                     for (BluetoothDevice selectedDevice : selectedDevices) {
                         BLEConnectionTask task = new BLEConnectionTask(getActivity(), selectedDevice, fileName.getText().toString(), characteristic.uuid, characteristic.name, taskMonitor);
                         Runnable taskWrapper = () -> {
                             try {
-//                                Log.i("BEST TAG", "Starting: " + threadName);
                                 task.run();
-//                                Log.i("BEST TAG", "Finished: " + threadName);
                             } catch (Exception e) {
-//                                Log.e("BLE", "Task interrupted: " + threadName, e);
+                                Log.e("BLE", "Task interrupted: ", e);
                             }
                         };
                         tasks.add(taskWrapper);
                     }
                 }
 
-                // Log the number of active threads after submission
-                System.out.println("Number of tasks submitted: " + tasks.size());
-
                 tasks.forEach(executorService::submit);
+
+                // Schedule a check after 1 second
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    int activeCount = taskMonitor.getNumberOfTasks();
+                    System.out.println("Active threads after 1 second: " + activeCount);
+                    if (activeCount != expectedThreadCount) {
+                        System.out.println("Incorrect number of threads, attempting to restart tasks.");
+                        restartTasks();
+                    }
+                }, 1000); // Delay of 1 second
+
             }
         });
 
@@ -161,5 +182,48 @@ public class TmntFragment extends Fragment {
                 }
             }
         });
+    }
+
+    private void restartTasks() {
+        if (executorService != null) {
+            executorService.shutdownNow();
+            try {
+                if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
+                    Log.e("TMWT", "Executor did not terminate in the allotted time.");
+                }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                Log.e("TMWT", "Thread interrupted during shutdown.", ie);
+            }
+        }
+        executorService = Executors.newFixedThreadPool(selectedDevices.size() * 4);
+        tasks.forEach(executorService::submit);
+        isRunning = true;
+    }
+
+    private Handler handler = new Handler(Looper.getMainLooper());
+    private Runnable updateTaskCountRunnable = new Runnable() {
+        @Override
+        public void run() {
+            refreshTaskCount();
+            handler.postDelayed(this, 1000); // schedule the next run in 1 second
+        }
+    };
+
+    private void refreshTaskCount() {
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
+                var numberOfRunningProcesses = taskMonitor.getNumberOfTasks();
+                runningProcessCount.setText("Running processes: " + numberOfRunningProcesses);
+
+                if (numberOfRunningProcesses == expectedThreadCount && expectedThreadCount != 0) {
+                    startAndStopText.setText("Start the test!");
+                    startAndStopText.setTextColor(getResources().getColor(R.color.colorGreen));
+                } else {
+                    startAndStopText.setText("Test is not ready");
+                    startAndStopText.setTextColor(getResources().getColor(R.color.colorRed));
+                }
+            });
+        }
     }
 }
