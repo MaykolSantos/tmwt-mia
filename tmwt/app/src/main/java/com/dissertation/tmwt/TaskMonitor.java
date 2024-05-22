@@ -12,7 +12,10 @@ public class TaskMonitor {
     }
 
     public void decrementTasks() {
-        taskCount.decrementAndGet();
+        if (taskCount.get() > 0) {
+            taskCount.decrementAndGet();
+        }
+
     }
 
     public int getNumberOfTasks() {

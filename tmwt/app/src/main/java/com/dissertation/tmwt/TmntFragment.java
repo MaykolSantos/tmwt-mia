@@ -2,29 +2,23 @@ package com.dissertation.tmwt;
 
 import android.bluetooth.BluetoothDevice;
 import android.os.Bundle;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ListView;
 import android.widget.TextView;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class TmntFragment extends Fragment {
@@ -124,7 +118,7 @@ public class TmntFragment extends Fragment {
                 tasks.clear(); // Clear previous tasks if any
                 for (CharacteristicInfo characteristic : characteristics) {
                     for (BluetoothDevice selectedDevice : selectedDevices) {
-                        BLEConnectionTask task = new BLEConnectionTask(getActivity(), selectedDevice, fileName.getText().toString(), characteristic.uuid, characteristic.name, taskMonitor);
+                        BLEConnectionTask task = new BLEConnectionTask(getActivity(), selectedDevice, fileName.getText().toString(), characteristic.uuid, characteristic.name, taskMonitor, numberOfTasks);
                         Runnable taskWrapper = () -> {
                             try {
                                 task.run();
